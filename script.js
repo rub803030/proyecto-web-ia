@@ -87,6 +87,31 @@ function buildUrl(page) {
 }
 
 /* ---------------------------------------------------------
+   Búsqueda y filtros
+   --------------------------------------------------------- */
+
+let searchTimer = null;
+
+/** Lee los controles de filtros y los guarda en el estado. */
+function syncFiltersFromUI() {
+  state.status = ui.statusFilter.value;
+  state.species = ui.speciesFilter.value;
+  state.gender = ui.genderFilter.value;
+  state.sort = ui.sortFilter.value;
+}
+
+/** Aplica los filtros actuales y vuelve siempre a la primera página. */
+function applyFilters() {
+  syncFiltersFromUI();
+  state.page = 1;
+  loadCharacters();
+}
+
+function updateClearButton() {
+  ui.clearSearch.hidden = ui.searchInput.value.length === 0;
+}
+
+/* ---------------------------------------------------------
    Interfaz: carga, tarjetas y paginación
    --------------------------------------------------------- */
 
@@ -195,6 +220,50 @@ async function loadCharacters() {
 
 ui.form.addEventListener('submit', (event) => {
   event.preventDefault();
+  window.clearTimeout(searchTimer);
+  state.query = ui.searchInput.value.trim();
+  applyFilters();
+});
+
+/* Búsqueda "en vivo" con retardo para no saturar la API en cada tecla. */
+ui.searchInput.addEventListener('input', () => {
+  updateClearButton();
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {
+    state.query = ui.searchInput.value.trim();
+    applyFilters();
+  }, 450);
+});
+
+/* Botón nativo de limpiar de los input type="search". */
+ui.searchInput.addEventListener('search', () => {
+  if (ui.searchInput.value === '') {
+    state.query = '';
+    applyFilters();
+  }
+});
+
+ui.clearSearch.addEventListener('click', () => {
+  ui.searchInput.value = '';
+  state.query = '';
+  updateClearButton();
+  applyFilters();
+  ui.searchInput.focus();
+});
+
+[ui.statusFilter, ui.speciesFilter, ui.genderFilter, ui.sortFilter].forEach((select) => {
+  select.addEventListener('change', applyFilters);
+});
+
+ui.resetBtn.addEventListener('click', () => {
+  ui.form.reset();
+  ui.statusFilter.value = '';
+  ui.speciesFilter.value = '';
+  ui.genderFilter.value = '';
+  ui.sortFilter.value = '';
+  state.query = '';
+  updateClearButton();
+  applyFilters();
 });
 
 ui.prevBtn.addEventListener('click', () => {
