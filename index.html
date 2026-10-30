@@ -117,14 +117,15 @@
 
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Vistas de resultados">
-        <button id="tabAll" class="tab is-active" role="tab" aria-selected="true" aria-controls="resultados" type="button">
+        <button id="tabAll" class="tab is-active" role="tab" aria-selected="true" aria-controls="resultados" tabindex="0" type="button">
           Todos
         </button>
-        <button id="tabFav" class="tab" role="tab" aria-selected="false" aria-controls="resultados" type="button">
+        <button id="tabFav" class="tab" role="tab" aria-selected="false" aria-controls="resultados" tabindex="-1" type="button">
           Favoritos <span id="favCount" class="badge">0</span>
         </button>
       </div>
       <p id="resultsInfo" class="results-info" aria-live="polite"></p>
+      <button id="clearFavBtn" class="btn btn--ghost btn--sm" type="button" hidden>Vaciar favoritos</button>
     </div>
 
     <section id="resultados" class="results" role="tabpanel" aria-live="polite">

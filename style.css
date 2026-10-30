@@ -470,6 +470,11 @@ h1, h2, h3, p {
   background: var(--surface-soft);
 }
 
+.btn--sm {
+  padding: 0.42rem 0.8rem;
+  font-size: 0.8rem;
+}
+
 /* ---------- 7. Barra de resultados ---------- */
 .toolbar {
   display: flex;
@@ -972,6 +977,24 @@ body.no-scroll {
 
   .results-info {
     width: 100%;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+
+  .pagination {
+    gap: 0.4rem;
+  }
+
+  .pagination .btn {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.8rem;
+  }
+
+  .pagination__info {
+    min-width: 5rem;
+    font-size: 0.78rem;
   }
 }
 

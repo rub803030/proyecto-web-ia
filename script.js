@@ -31,6 +31,7 @@ const ui = {
   tabFav: document.getElementById('tabFav'),
   favCount: document.getElementById('favCount'),
   resultsInfo: document.getElementById('resultsInfo'),
+  clearFavBtn: document.getElementById('clearFavBtn'),
   message: document.getElementById('message'),
   messageIcon: document.getElementById('messageIcon'),
   messageText: document.getElementById('messageText'),
@@ -249,6 +250,7 @@ function toggleFavorite(character) {
 
   saveFavorites();
   renderFavoritesCount();
+  updateClearFavButton();
 
   if (state.view === 'favorites') {
     renderFavorites();
@@ -272,6 +274,31 @@ function renderFavoritesCount() {
   ui.favCount.textContent = String(favorites.length);
 }
 
+/** El botón "Vaciar favoritos" solo tiene sentido en la vista de favoritos. */
+function updateClearFavButton() {
+  ui.clearFavBtn.hidden = state.view !== 'favorites' || favorites.length === 0;
+}
+
+function clearFavorites() {
+  if (favorites.length === 0) return;
+
+  const confirmed = window.confirm(
+    `¿Seguro que quieres vaciar tus ${favorites.length} favoritos? Esta acción no se puede deshacer.`
+  );
+  if (!confirmed) return;
+
+  favorites = [];
+  try {
+    localStorage.removeItem(STORAGE_KEYS.favorites); // Se elimina la clave completa.
+  } catch (error) {
+    console.warn('No se pudo borrar el almacenamiento de favoritos:', error);
+  }
+
+  renderFavoritesCount();
+  renderFavorites();
+  updateClearFavButton();
+}
+
 /* ---------------------------------------------------------
    Filtros sobre favoritos y cambio de vista
    --------------------------------------------------------- */
@@ -289,6 +316,7 @@ function matchesFilters(character) {
 function renderFavorites() {
   setLoading(false);
   ui.pagination.hidden = true;
+  updateClearFavButton();
   const list = favorites.filter(matchesFilters);
 
   if (favorites.length === 0) {
@@ -326,6 +354,9 @@ function setView(view) {
   ui.tabFav.classList.toggle('is-active', !isAll);
   ui.tabAll.setAttribute('aria-selected', String(isAll));
   ui.tabFav.setAttribute('aria-selected', String(!isAll));
+  ui.tabAll.tabIndex = isAll ? 0 : -1;
+  ui.tabFav.tabIndex = isAll ? -1 : 0;
+  updateClearFavButton();
 
   if (isAll) {
     state.page = 1;
@@ -406,6 +437,7 @@ function closeDetail() {
 function setLoading(isLoading) {
   ui.skeleton.hidden = !isLoading;
   ui.grid.hidden = isLoading;
+  ui.grid.setAttribute('aria-busy', String(isLoading));
   if (isLoading) {
     ui.skeleton.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card"></div>').join('');
     ui.pagination.hidden = true;
@@ -685,6 +717,19 @@ ui.modal.addEventListener('close', () => {
 
 ui.tabAll.addEventListener('click', () => setView('all'));
 ui.tabFav.addEventListener('click', () => setView('favorites'));
+
+ui.clearFavBtn.addEventListener('click', clearFavorites);
+
+/* Las pestañas se recorren con las flechas del teclado (patrón ARIA tabs). */
+[ui.tabAll, ui.tabFav].forEach((tab) => {
+  tab.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const target = tab === ui.tabAll ? ui.tabFav : ui.tabAll;
+    target.focus();
+    setView(target === ui.tabAll ? 'all' : 'favorites');
+  });
+});
 
 ui.themeToggle.addEventListener('click', toggleTheme);
 
