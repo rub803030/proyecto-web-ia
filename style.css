@@ -83,6 +83,11 @@ img {
   max-width: 100%;
 }
 
+/* El atributo hidden debe ocultar siempre, aunque la clase defina display. */
+[hidden] {
+  display: none !important;
+}
+
 button,
 input,
 select {
