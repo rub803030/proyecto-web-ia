@@ -6,6 +6,16 @@
   <meta name="description" content="Explorador interactivo de personajes de Rick and Morty: busca, filtra y guarda tus favoritos. Datos en vivo desde la API pública.">
   <meta name="theme-color" content="#0e1116">
   <title>Explorador Rick &amp; Morty | Proyecto Web IA</title>
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar el "flash" blanco.
+    try {
+      const savedTheme = localStorage.getItem('rm-theme-v1');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = savedTheme || (prefersDark ? 'dark' : 'light');
+    } catch (error) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>

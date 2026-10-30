@@ -14,6 +14,9 @@ const STORAGE_KEYS = {
 
 /* Referencias al DOM (se resuelven una sola vez) */
 const ui = {
+  themeToggle: document.getElementById('themeToggle'),
+  themeIcon: document.getElementById('themeIcon'),
+  themeLabel: document.getElementById('themeLabel'),
   form: document.getElementById('searchForm'),
   searchInput: document.getElementById('searchInput'),
   clearSearch: document.getElementById('clearSearch'),
@@ -84,6 +87,85 @@ function buildUrl(page) {
   if (state.species) params.set('species', state.species);
   if (state.gender) params.set('gender', state.gender);
   return `${API_URL}/?${params.toString()}`;
+}
+
+/* ---------------------------------------------------------
+   Reto extra 1: tema claro / oscuro
+   --------------------------------------------------------- */
+
+function getPreferredTheme() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.theme);
+    if (saved === 'dark' || saved === 'light') return saved;
+  } catch (error) {
+    // Si localStorage está bloqueado se usa la preferencia del sistema.
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+  const isDark = theme === 'dark';
+  document.documentElement.dataset.theme = theme;
+  ui.themeToggle.setAttribute('aria-pressed', String(isDark));
+  ui.themeIcon.textContent = isDark ? '☀️' : '🌙';
+  ui.themeLabel.textContent = isDark ? 'Modo claro' : 'Modo oscuro';
+  document.querySelector('meta[name="theme-color"]')
+    .setAttribute('content', isDark ? '#0b0f14' : '#f4f7f5');
+}
+
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try {
+    localStorage.setItem(STORAGE_KEYS.theme, next);
+  } catch (error) {
+    console.warn('No se pudo guardar la preferencia de tema:', error);
+  }
+}
+
+/* ---------------------------------------------------------
+   Reto extra 2: historial de búsquedas
+   --------------------------------------------------------- */
+
+const MAX_HISTORY = 6;
+
+function readHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string').slice(0, MAX_HISTORY) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+let searchHistory = readHistory();
+
+function persistHistory() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(searchHistory));
+  } catch (error) {
+    console.warn('No se pudo guardar el historial:', error);
+  }
+}
+
+function addToHistory(term) {
+  const clean = term.trim();
+  if (clean.length < 2) return;
+  searchHistory = [clean, ...searchHistory.filter((item) => item.toLowerCase() !== clean.toLowerCase())]
+    .slice(0, MAX_HISTORY);
+  persistHistory();
+  renderHistory();
+}
+
+function renderHistory() {
+  ui.history.hidden = searchHistory.length === 0;
+  const chips = searchHistory
+    .map((term) => `<button class="chip" type="button" data-term="${escapeHtml(term)}">${escapeHtml(term)}</button>`)
+    .join('');
+  const clear = searchHistory.length
+    ? '<button class="chip chip--clear" type="button" data-action="clear-history">Borrar historial</button>'
+    : '';
+  ui.historyList.innerHTML = chips + clear;
 }
 
 /* ---------------------------------------------------------
@@ -302,8 +384,20 @@ function characterCard(character) {
   `;
 }
 
+/** Reto extra 3: orden alfabético de la página visible. */
+function sortCharacters(characters) {
+  const collator = new Intl.Collator('es', { sensitivity: 'base' });
+  if (state.sort === 'az') {
+    return [...characters].sort((a, b) => collator.compare(a.name, b.name));
+  }
+  if (state.sort === 'za') {
+    return [...characters].sort((a, b) => collator.compare(b.name, a.name));
+  }
+  return characters;
+}
+
 function renderCards(characters) {
-  ui.grid.innerHTML = characters.map(characterCard).join('');
+  ui.grid.innerHTML = sortCharacters(characters).map(characterCard).join('');
 }
 
 function updatePagination() {
@@ -397,7 +491,8 @@ async function loadCharacters({ scroll = false } = {}) {
 function describeResults() {
   const total = state.totalCount;
   const noun = total === 1 ? 'personaje encontrado' : 'personajes encontrados';
-  return `${total} ${noun} · página ${state.page} de ${state.totalPages}`;
+  const order = state.sort ? ' · orden aplicado a esta página' : '';
+  return `${total} ${noun} · página ${state.page} de ${state.totalPages}${order}`;
 }
 
 /* ---------------------------------------------------------
@@ -408,6 +503,7 @@ ui.form.addEventListener('submit', (event) => {
   event.preventDefault();
   window.clearTimeout(searchTimer);
   state.query = ui.searchInput.value.trim();
+  addToHistory(state.query);
   applyFilters();
 });
 
@@ -417,6 +513,7 @@ ui.searchInput.addEventListener('input', () => {
   window.clearTimeout(searchTimer);
   searchTimer = window.setTimeout(() => {
     state.query = ui.searchInput.value.trim();
+    addToHistory(state.query);
     applyFilters();
   }, 450);
 });
@@ -488,9 +585,33 @@ ui.grid.addEventListener('click', (event) => {
 ui.tabAll.addEventListener('click', () => setView('all'));
 ui.tabFav.addEventListener('click', () => setView('favorites'));
 
+ui.themeToggle.addEventListener('click', toggleTheme);
+
+/* Chips del historial: repiten una búsqueda o borran el historial. */
+ui.historyList.addEventListener('click', (event) => {
+  if (event.target.closest('[data-action="clear-history"]')) {
+    searchHistory = [];
+    persistHistory();
+    renderHistory();
+    return;
+  }
+
+  const chip = event.target.closest('[data-term]');
+  if (!chip) return;
+
+  const term = chip.dataset.term;
+  ui.searchInput.value = term;
+  state.query = term;
+  updateClearButton();
+  addToHistory(term);
+  applyFilters();
+});
+
 /* ---------------------------------------------------------
    Arranque
    --------------------------------------------------------- */
 
+applyTheme(getPreferredTheme());
+renderHistory();
 renderFavoritesCount();
 loadCharacters();
