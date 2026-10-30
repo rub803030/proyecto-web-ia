@@ -104,11 +104,150 @@ function syncFiltersFromUI() {
 function applyFilters() {
   syncFiltersFromUI();
   state.page = 1;
-  loadCharacters();
+  if (state.view === 'favorites') {
+    renderFavorites();
+  } else {
+    loadCharacters();
+  }
 }
 
 function updateClearButton() {
   ui.clearSearch.hidden = ui.searchInput.value.length === 0;
+}
+
+/* ---------------------------------------------------------
+   Favoritos persistentes (localStorage)
+   --------------------------------------------------------- */
+
+function readFavorites() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.favorites);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item) => item && Number.isInteger(item.id)) : [];
+  } catch (error) {
+    console.warn('Los favoritos guardados están dañados:', error);
+    return [];
+  }
+}
+
+let favorites = readFavorites();
+
+function saveFavorites() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(favorites));
+  } catch (error) {
+    console.warn('No se pudieron guardar los favoritos:', error);
+    showMessage({
+      icon: '💾',
+      title: 'No se pudo guardar',
+      text: 'Tu navegador no permite guardar datos para este sitio.',
+      variant: 'error'
+    });
+  }
+}
+
+function isFavorite(id) {
+  return favorites.some((character) => character.id === id);
+}
+
+function findCharacter(id) {
+  return state.items.find((character) => character.id === id)
+    || favorites.find((character) => character.id === id)
+    || null;
+}
+
+function toggleFavorite(character) {
+  const active = isFavorite(character.id);
+  favorites = active
+    ? favorites.filter((item) => item.id !== character.id)
+    : [...favorites, character];
+
+  saveFavorites();
+  renderFavoritesCount();
+
+  if (state.view === 'favorites') {
+    renderFavorites();
+  } else {
+    refreshFavoriteButtons();
+  }
+}
+
+/** Actualiza el estado visual de los corazones ya dibujados. */
+function refreshFavoriteButtons() {
+  ui.grid.querySelectorAll('.fav-btn').forEach((button) => {
+    const card = button.closest('.card');
+    const active = isFavorite(Number(card.dataset.id));
+    const name = button.dataset.name;
+    button.setAttribute('aria-pressed', String(active));
+    button.setAttribute('aria-label', `${active ? 'Quitar' : 'Agregar'} ${name} ${active ? 'de' : 'a'} favoritos`);
+  });
+}
+
+function renderFavoritesCount() {
+  ui.favCount.textContent = String(favorites.length);
+}
+
+/* ---------------------------------------------------------
+   Filtros sobre favoritos y cambio de vista
+   --------------------------------------------------------- */
+
+/** Comprueba si un personaje cumple los filtros (para la vista de favoritos). */
+function matchesFilters(character) {
+  const query = state.query.toLowerCase();
+  if (query && !character.name.toLowerCase().includes(query)) return false;
+  if (state.status && character.status.toLowerCase() !== state.status) return false;
+  if (state.species && character.species !== state.species) return false;
+  if (state.gender && character.gender.toLowerCase() !== state.gender) return false;
+  return true;
+}
+
+function renderFavorites() {
+  setLoading(false);
+  ui.pagination.hidden = true;
+  const list = favorites.filter(matchesFilters);
+
+  if (favorites.length === 0) {
+    ui.grid.innerHTML = '';
+    updateResultsInfo('');
+    showMessage({
+      icon: '💔',
+      title: 'Todavía no tienes favoritos',
+      text: 'Pulsa el corazón de cualquier personaje para guardarlo en este navegador.'
+    });
+    return;
+  }
+
+  if (list.length === 0) {
+    ui.grid.innerHTML = '';
+    updateResultsInfo(`0 de ${favorites.length} favoritos`);
+    showMessage({
+      icon: '🔍',
+      title: 'Ningún favorito coincide con la búsqueda',
+      text: 'Prueba con otro nombre o limpia los filtros para ver todos tus favoritos.'
+    });
+    return;
+  }
+
+  hideMessage();
+  renderCards(list);
+  updateResultsInfo(`${list.length} de ${favorites.length} favoritos guardados`);
+}
+
+function setView(view) {
+  state.view = view;
+  const isAll = view === 'all';
+
+  ui.tabAll.classList.toggle('is-active', isAll);
+  ui.tabFav.classList.toggle('is-active', !isAll);
+  ui.tabAll.setAttribute('aria-selected', String(isAll));
+  ui.tabFav.setAttribute('aria-selected', String(!isAll));
+
+  if (isAll) {
+    state.page = 1;
+    loadCharacters();
+  } else {
+    renderFavorites();
+  }
 }
 
 /* ---------------------------------------------------------
@@ -138,6 +277,9 @@ function hideMessage() {
 /** Genera el HTML de una tarjeta de personaje. */
 function characterCard(character) {
   const statusClass = `card__status--${character.status?.toLowerCase() || 'unknown'}`;
+  const favorite = isFavorite(character.id);
+  const favoriteLabel = `${favorite ? 'Quitar' : 'Agregar'} ${character.name} ${favorite ? 'de' : 'a'} favoritos`;
+
   return `
     <article class="card" data-id="${character.id}">
       <div class="card__media">
@@ -146,6 +288,8 @@ function characterCard(character) {
         <span class="card__status ${statusClass}">
           <span class="dot"></span>${labelFor(STATUS_LABELS, character.status?.toLowerCase())}
         </span>
+        <button class="fav-btn" type="button" data-action="fav" data-name="${escapeHtml(character.name)}"
+                aria-pressed="${favorite}" aria-label="${escapeHtml(favoriteLabel)}">♥</button>
       </div>
       <div class="card__body">
         <h3 class="card__name">${escapeHtml(character.name)}</h3>
@@ -179,12 +323,37 @@ function updateResultsInfo(text) {
    Consulta a la API
    --------------------------------------------------------- */
 
-async function loadCharacters() {
+let activeRequest = null;
+
+async function loadCharacters({ scroll = false } = {}) {
+  // Cancela la petición anterior para que no sobrescriba los resultados nuevos.
+  if (activeRequest) activeRequest.abort();
+  const controller = new AbortController();
+  activeRequest = controller;
+
   setLoading(true);
   hideMessage();
+  ui.retryBtn.hidden = true;
 
   try {
-    const response = await fetch(buildUrl(state.page));
+    const response = await fetch(buildUrl(state.page), { signal: controller.signal });
+
+    // La API responde 404 cuando la búsqueda no devuelve ningún personaje.
+    if (response.status === 404) {
+      state.items = [];
+      state.totalPages = 0;
+      state.totalCount = 0;
+      ui.grid.innerHTML = '';
+      ui.pagination.hidden = true;
+      updateResultsInfo('0 resultados');
+      showMessage({
+        icon: '🔍',
+        title: 'Sin resultados',
+        text: `No encontramos personajes${state.query ? ` para «${state.query}»` : ''} con esos filtros. Prueba con otro nombre o pulsa «Limpiar filtros».`
+      });
+      return;
+    }
+
     if (!response.ok) {
       throw new Error(`La API respondió con el código ${response.status}`);
     }
@@ -196,22 +365,39 @@ async function loadCharacters() {
 
     renderCards(state.items);
     updatePagination();
-    updateResultsInfo(`${state.totalCount} personajes encontrados · página ${state.page} de ${state.totalPages}`);
+    updateResultsInfo(describeResults());
+
+    if (scroll) {
+      ui.grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   } catch (error) {
+    if (error.name === 'AbortError') return; // Petición reemplazada por una más reciente.
+
     state.items = [];
     ui.grid.innerHTML = '';
     ui.pagination.hidden = true;
     updateResultsInfo('');
+    ui.retryBtn.hidden = false;
     showMessage({
       icon: '📡',
-      title: 'No se pudo conectar con la API',
-      text: 'Revisa tu conexión a internet e inténtalo de nuevo.',
+      title: 'No se pudo consultar la API',
+      text: navigator.onLine
+        ? 'El servicio no respondió. Puede ser un fallo temporal: inténtalo de nuevo en unos segundos.'
+        : 'Parece que no tienes conexión a internet. Revísala y vuelve a intentarlo.',
       variant: 'error'
     });
     console.error('Error al consultar la API:', error);
   } finally {
-    setLoading(false);
+    // Solo la petición vigente controla el esqueleto de carga.
+    if (!controller.signal.aborted) setLoading(false);
   }
+}
+
+/** Texto descriptivo del resultado actual. */
+function describeResults() {
+  const total = state.totalCount;
+  const noun = total === 1 ? 'personaje encontrado' : 'personajes encontrados';
+  return `${total} ${noun} · página ${state.page} de ${state.totalPages}`;
 }
 
 /* ---------------------------------------------------------
@@ -269,19 +455,42 @@ ui.resetBtn.addEventListener('click', () => {
 ui.prevBtn.addEventListener('click', () => {
   if (state.page > 1) {
     state.page -= 1;
-    loadCharacters();
+    loadCharacters({ scroll: true });
   }
 });
 
 ui.nextBtn.addEventListener('click', () => {
   if (state.page < state.totalPages) {
     state.page += 1;
+    loadCharacters({ scroll: true });
+  }
+});
+
+ui.retryBtn.addEventListener('click', () => loadCharacters());
+
+/* Al recuperar la conexión se reintenta la última consulta automáticamente. */
+window.addEventListener('online', () => {
+  if (state.view === 'all' && ui.message.classList.contains('message--error')) {
     loadCharacters();
   }
 });
+
+/* Delegación de eventos: un solo listener para todos los corazones. */
+ui.grid.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-action="fav"]');
+  if (!button) return;
+
+  const card = button.closest('.card');
+  const character = findCharacter(Number(card.dataset.id));
+  if (character) toggleFavorite(character);
+});
+
+ui.tabAll.addEventListener('click', () => setView('all'));
+ui.tabFav.addEventListener('click', () => setView('favorites'));
 
 /* ---------------------------------------------------------
    Arranque
    --------------------------------------------------------- */
 
+renderFavoritesCount();
 loadCharacters();
