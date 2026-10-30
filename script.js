@@ -31,6 +31,7 @@ const ui = {
   tabFav: document.getElementById('tabFav'),
   favCount: document.getElementById('favCount'),
   resultsInfo: document.getElementById('resultsInfo'),
+  clearFavBtn: document.getElementById('clearFavBtn'),
   message: document.getElementById('message'),
   messageIcon: document.getElementById('messageIcon'),
   messageText: document.getElementById('messageText'),
@@ -40,7 +41,10 @@ const ui = {
   pagination: document.getElementById('pagination'),
   prevBtn: document.getElementById('prevBtn'),
   nextBtn: document.getElementById('nextBtn'),
-  pageInfo: document.getElementById('pageInfo')
+  pageInfo: document.getElementById('pageInfo'),
+  modal: document.getElementById('detailModal'),
+  modalBody: document.getElementById('modalBody'),
+  modalClose: document.getElementById('modalClose')
 };
 
 /* Estado central de la aplicación */
@@ -246,6 +250,7 @@ function toggleFavorite(character) {
 
   saveFavorites();
   renderFavoritesCount();
+  updateClearFavButton();
 
   if (state.view === 'favorites') {
     renderFavorites();
@@ -269,6 +274,31 @@ function renderFavoritesCount() {
   ui.favCount.textContent = String(favorites.length);
 }
 
+/** El botón "Vaciar favoritos" solo tiene sentido en la vista de favoritos. */
+function updateClearFavButton() {
+  ui.clearFavBtn.hidden = state.view !== 'favorites' || favorites.length === 0;
+}
+
+function clearFavorites() {
+  if (favorites.length === 0) return;
+
+  const confirmed = window.confirm(
+    `¿Seguro que quieres vaciar tus ${favorites.length} favoritos? Esta acción no se puede deshacer.`
+  );
+  if (!confirmed) return;
+
+  favorites = [];
+  try {
+    localStorage.removeItem(STORAGE_KEYS.favorites); // Se elimina la clave completa.
+  } catch (error) {
+    console.warn('No se pudo borrar el almacenamiento de favoritos:', error);
+  }
+
+  renderFavoritesCount();
+  renderFavorites();
+  updateClearFavButton();
+}
+
 /* ---------------------------------------------------------
    Filtros sobre favoritos y cambio de vista
    --------------------------------------------------------- */
@@ -286,6 +316,7 @@ function matchesFilters(character) {
 function renderFavorites() {
   setLoading(false);
   ui.pagination.hidden = true;
+  updateClearFavButton();
   const list = favorites.filter(matchesFilters);
 
   if (favorites.length === 0) {
@@ -323,6 +354,9 @@ function setView(view) {
   ui.tabFav.classList.toggle('is-active', !isAll);
   ui.tabAll.setAttribute('aria-selected', String(isAll));
   ui.tabFav.setAttribute('aria-selected', String(!isAll));
+  ui.tabAll.tabIndex = isAll ? 0 : -1;
+  ui.tabFav.tabIndex = isAll ? -1 : 0;
+  updateClearFavButton();
 
   if (isAll) {
     state.page = 1;
@@ -333,12 +367,77 @@ function setView(view) {
 }
 
 /* ---------------------------------------------------------
+   Modal de detalle del personaje
+   --------------------------------------------------------- */
+
+let modalRequest = null;
+
+function detailTemplate(character) {
+  const favorite = isFavorite(character.id);
+  return `
+    <div class="detail">
+      <img class="detail__img" src="${escapeHtml(character.image)}" alt="Retrato de ${escapeHtml(character.name)}"
+           width="320" height="320">
+      <div class="detail__info">
+        <span class="card__status card__status--${character.status?.toLowerCase() || 'unknown'} detail__status">
+          <span class="dot"></span>${labelFor(STATUS_LABELS, character.status?.toLowerCase())}
+        </span>
+        <h3 class="detail__name">${escapeHtml(character.name)}</h3>
+        <dl class="detail__list">
+          <div><dt>Especie</dt><dd>${escapeHtml(character.species)}</dd></div>
+          <div><dt>Tipo</dt><dd>${escapeHtml(character.type || 'Sin dato')}</dd></div>
+          <div><dt>Género</dt><dd>${escapeHtml(labelFor(GENDER_LABELS, character.gender))}</dd></div>
+          <div><dt>Origen</dt><dd>${escapeHtml(character.origin?.name || 'Desconocido')}</dd></div>
+          <div><dt>Última ubicación</dt><dd>${escapeHtml(character.location?.name || 'Desconocida')}</dd></div>
+          <div><dt>Episodios</dt><dd>${character.episode?.length ?? 0}</dd></div>
+        </dl>
+        <button class="btn btn--primary detail__fav" type="button" data-action="fav"
+                data-id="${character.id}" data-name="${escapeHtml(character.name)}" aria-pressed="${favorite}">
+          ♥ ${favorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function openDetail(id) {
+  ui.modalBody.innerHTML = '<p class="detail__loading">Cargando información del personaje…</p>';
+  ui.modal.showModal();
+  document.body.classList.add('no-scroll');
+
+  if (modalRequest) modalRequest.abort();
+  const controller = new AbortController();
+  modalRequest = controller;
+
+  try {
+    const response = await fetch(`${API_URL}/${id}`, { signal: controller.signal });
+    if (!response.ok) throw new Error(`La API respondió con el código ${response.status}`);
+
+    const character = await response.json();
+    ui.modalBody.innerHTML = detailTemplate(character);
+  } catch (error) {
+    if (error.name === 'AbortError') return;
+    ui.modalBody.innerHTML = `
+      <p class="detail__error">
+        No se pudo cargar el detalle del personaje. Revisa tu conexión e inténtalo de nuevo.
+      </p>
+    `;
+    console.error('Error al cargar el detalle:', error);
+  }
+}
+
+function closeDetail() {
+  ui.modal.close();
+}
+
+/* ---------------------------------------------------------
    Interfaz: carga, tarjetas y paginación
    --------------------------------------------------------- */
 
 function setLoading(isLoading) {
   ui.skeleton.hidden = !isLoading;
   ui.grid.hidden = isLoading;
+  ui.grid.setAttribute('aria-busy', String(isLoading));
   if (isLoading) {
     ui.skeleton.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card"></div>').join('');
     ui.pagination.hidden = true;
@@ -379,6 +478,9 @@ function characterCard(character) {
           <span>${escapeHtml(character.species)}</span>
           <span>${escapeHtml(labelFor(GENDER_LABELS, character.gender))}</span>
         </p>
+        <button class="card__detail" type="button" data-action="detail">
+          Ver detalle <span aria-hidden="true">→</span>
+        </button>
       </div>
     </article>
   `;
@@ -572,8 +674,14 @@ window.addEventListener('online', () => {
   }
 });
 
-/* Delegación de eventos: un solo listener para todos los corazones. */
+/* Delegación de eventos: un solo listener para corazones y detalles. */
 ui.grid.addEventListener('click', (event) => {
+  const detailButton = event.target.closest('[data-action="detail"]');
+  if (detailButton) {
+    openDetail(Number(detailButton.closest('.card').dataset.id));
+    return;
+  }
+
   const button = event.target.closest('[data-action="fav"]');
   if (!button) return;
 
@@ -582,8 +690,46 @@ ui.grid.addEventListener('click', (event) => {
   if (character) toggleFavorite(character);
 });
 
+/* Favorito desde el modal: se actualizan el botón y las tarjetas. */
+ui.modalBody.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-action="fav"]');
+  if (!button) return;
+
+  const character = findCharacter(Number(button.dataset.id));
+  if (!character) return;
+
+  toggleFavorite(character);
+  const active = isFavorite(character.id);
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = `♥ ${active ? 'Quitar de favoritos' : 'Guardar en favoritos'}`;
+});
+
+ui.modalClose.addEventListener('click', closeDetail);
+
+/* Cerrar al hacer clic fuera del contenido. */
+ui.modal.addEventListener('click', (event) => {
+  if (event.target === ui.modal) closeDetail();
+});
+
+ui.modal.addEventListener('close', () => {
+  document.body.classList.remove('no-scroll');
+});
+
 ui.tabAll.addEventListener('click', () => setView('all'));
 ui.tabFav.addEventListener('click', () => setView('favorites'));
+
+ui.clearFavBtn.addEventListener('click', clearFavorites);
+
+/* Las pestañas se recorren con las flechas del teclado (patrón ARIA tabs). */
+[ui.tabAll, ui.tabFav].forEach((tab) => {
+  tab.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const target = tab === ui.tabAll ? ui.tabFav : ui.tabAll;
+    target.focus();
+    setView(target === ui.tabAll ? 'all' : 'favorites');
+  });
+});
 
 ui.themeToggle.addEventListener('click', toggleTheme);
 

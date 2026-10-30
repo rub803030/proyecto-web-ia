@@ -470,6 +470,11 @@ h1, h2, h3, p {
   background: var(--surface-soft);
 }
 
+.btn--sm {
+  padding: 0.42rem 0.8rem;
+  font-size: 0.8rem;
+}
+
 /* ---------- 7. Barra de resultados ---------- */
 .toolbar {
   display: flex;
@@ -659,6 +664,31 @@ h1, h2, h3, p {
   margin-right: 0.55rem;
 }
 
+.card__detail {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary-strong);
+  cursor: pointer;
+}
+
+.card__detail:hover {
+  text-decoration: underline;
+}
+
+.card__detail span {
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.card__detail:hover span {
+  transform: translateX(3px);
+}
+
 /* ---------- 9. Esqueletos de carga ---------- */
 .grid--skeleton .skeleton-card {
   height: 290px;
@@ -725,7 +755,156 @@ h1, h2, h3, p {
   color: var(--text-soft);
 }
 
-/* ---------- 12. Pie de página ---------- */
+/* ---------- 12. Modal de detalle ---------- */
+body.no-scroll {
+  overflow: hidden;
+}
+
+.modal {
+  width: min(760px, calc(100% - 2rem));
+  max-height: min(88vh, 720px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  overflow: auto;
+}
+
+.modal::backdrop {
+  background: rgba(5, 9, 7, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.modal__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.modal__title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.modal__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.modal__close:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.modal__body {
+  padding: 1.25rem;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.detail__img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.detail__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail__status {
+  position: static;
+  align-self: flex-start;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.detail__name {
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  line-height: 1.15;
+}
+
+.detail__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0;
+}
+
+.detail__list dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.detail__list dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.detail__fav {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+}
+
+.detail__loading,
+.detail__error {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.detail__error {
+  color: var(--danger);
+}
+
+@media (max-width: 560px) {
+  .detail {
+    grid-template-columns: 1fr;
+  }
+
+  .detail__img {
+    max-height: 260px;
+    aspect-ratio: 16 / 10;
+  }
+
+  .modal__body {
+    padding: 1rem;
+  }
+}
+
+/* ---------- 13. Pie de página ---------- */
 .site-footer {
   margin-top: 4rem;
   padding: 1.6rem 0;
@@ -798,6 +977,24 @@ h1, h2, h3, p {
 
   .results-info {
     width: 100%;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+
+  .pagination {
+    gap: 0.4rem;
+  }
+
+  .pagination .btn {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.8rem;
+  }
+
+  .pagination__info {
+    min-width: 5rem;
+    font-size: 0.78rem;
   }
 }
 
