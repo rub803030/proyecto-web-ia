@@ -40,7 +40,10 @@ const ui = {
   pagination: document.getElementById('pagination'),
   prevBtn: document.getElementById('prevBtn'),
   nextBtn: document.getElementById('nextBtn'),
-  pageInfo: document.getElementById('pageInfo')
+  pageInfo: document.getElementById('pageInfo'),
+  modal: document.getElementById('detailModal'),
+  modalBody: document.getElementById('modalBody'),
+  modalClose: document.getElementById('modalClose')
 };
 
 /* Estado central de la aplicación */
@@ -333,6 +336,70 @@ function setView(view) {
 }
 
 /* ---------------------------------------------------------
+   Modal de detalle del personaje
+   --------------------------------------------------------- */
+
+let modalRequest = null;
+
+function detailTemplate(character) {
+  const favorite = isFavorite(character.id);
+  return `
+    <div class="detail">
+      <img class="detail__img" src="${escapeHtml(character.image)}" alt="Retrato de ${escapeHtml(character.name)}"
+           width="320" height="320">
+      <div class="detail__info">
+        <span class="card__status card__status--${character.status?.toLowerCase() || 'unknown'} detail__status">
+          <span class="dot"></span>${labelFor(STATUS_LABELS, character.status?.toLowerCase())}
+        </span>
+        <h3 class="detail__name">${escapeHtml(character.name)}</h3>
+        <dl class="detail__list">
+          <div><dt>Especie</dt><dd>${escapeHtml(character.species)}</dd></div>
+          <div><dt>Tipo</dt><dd>${escapeHtml(character.type || 'Sin dato')}</dd></div>
+          <div><dt>Género</dt><dd>${escapeHtml(labelFor(GENDER_LABELS, character.gender))}</dd></div>
+          <div><dt>Origen</dt><dd>${escapeHtml(character.origin?.name || 'Desconocido')}</dd></div>
+          <div><dt>Última ubicación</dt><dd>${escapeHtml(character.location?.name || 'Desconocida')}</dd></div>
+          <div><dt>Episodios</dt><dd>${character.episode?.length ?? 0}</dd></div>
+        </dl>
+        <button class="btn btn--primary detail__fav" type="button" data-action="fav"
+                data-id="${character.id}" data-name="${escapeHtml(character.name)}" aria-pressed="${favorite}">
+          ♥ ${favorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function openDetail(id) {
+  ui.modalBody.innerHTML = '<p class="detail__loading">Cargando información del personaje…</p>';
+  ui.modal.showModal();
+  document.body.classList.add('no-scroll');
+
+  if (modalRequest) modalRequest.abort();
+  const controller = new AbortController();
+  modalRequest = controller;
+
+  try {
+    const response = await fetch(`${API_URL}/${id}`, { signal: controller.signal });
+    if (!response.ok) throw new Error(`La API respondió con el código ${response.status}`);
+
+    const character = await response.json();
+    ui.modalBody.innerHTML = detailTemplate(character);
+  } catch (error) {
+    if (error.name === 'AbortError') return;
+    ui.modalBody.innerHTML = `
+      <p class="detail__error">
+        No se pudo cargar el detalle del personaje. Revisa tu conexión e inténtalo de nuevo.
+      </p>
+    `;
+    console.error('Error al cargar el detalle:', error);
+  }
+}
+
+function closeDetail() {
+  ui.modal.close();
+}
+
+/* ---------------------------------------------------------
    Interfaz: carga, tarjetas y paginación
    --------------------------------------------------------- */
 
@@ -379,6 +446,9 @@ function characterCard(character) {
           <span>${escapeHtml(character.species)}</span>
           <span>${escapeHtml(labelFor(GENDER_LABELS, character.gender))}</span>
         </p>
+        <button class="card__detail" type="button" data-action="detail">
+          Ver detalle <span aria-hidden="true">→</span>
+        </button>
       </div>
     </article>
   `;
@@ -572,14 +642,45 @@ window.addEventListener('online', () => {
   }
 });
 
-/* Delegación de eventos: un solo listener para todos los corazones. */
+/* Delegación de eventos: un solo listener para corazones y detalles. */
 ui.grid.addEventListener('click', (event) => {
+  const detailButton = event.target.closest('[data-action="detail"]');
+  if (detailButton) {
+    openDetail(Number(detailButton.closest('.card').dataset.id));
+    return;
+  }
+
   const button = event.target.closest('[data-action="fav"]');
   if (!button) return;
 
   const card = button.closest('.card');
   const character = findCharacter(Number(card.dataset.id));
   if (character) toggleFavorite(character);
+});
+
+/* Favorito desde el modal: se actualizan el botón y las tarjetas. */
+ui.modalBody.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-action="fav"]');
+  if (!button) return;
+
+  const character = findCharacter(Number(button.dataset.id));
+  if (!character) return;
+
+  toggleFavorite(character);
+  const active = isFavorite(character.id);
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = `♥ ${active ? 'Quitar de favoritos' : 'Guardar en favoritos'}`;
+});
+
+ui.modalClose.addEventListener('click', closeDetail);
+
+/* Cerrar al hacer clic fuera del contenido. */
+ui.modal.addEventListener('click', (event) => {
+  if (event.target === ui.modal) closeDetail();
+});
+
+ui.modal.addEventListener('close', () => {
+  document.body.classList.remove('no-scroll');
 });
 
 ui.tabAll.addEventListener('click', () => setView('all'));
