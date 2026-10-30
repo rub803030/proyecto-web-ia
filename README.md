@@ -67,7 +67,7 @@ Todo el contenido de las tarjetas proviene de la API: **no hay personajes escrit
 | 8 | Mensajes de error y sin resultados | Función `showMessage()` y manejo del código 404 |
 | 9 | Interfaz adaptable | Consultas de medios en `style.css` (720 px y 480 px) |
 | 10 | Publicación con GitHub Pages | https://rub803030.github.io/proyecto-web-ia/ |
-| 11 | Al menos 6 commits con avances reales | 11 commits en `main` (8 de desarrollo, 2 del Pull Request y el commit de fusión) |
+| 11 | Al menos 6 commits con avances reales | 14 commits en `main` (8 de desarrollo, 2 del Pull Request #3, el *merge commit* y 3 ajustes posteriores) |
 | 12 | Al menos 2 Issues | [#1](https://github.com/rub803030/proyecto-web-ia/issues/1) y [#2](https://github.com/rub803030/proyecto-web-ia/issues/2) |
 | 13 | Al menos un Pull Request | [Pull Request #3](https://github.com/rub803030/proyecto-web-ia/pull/3) |
 
@@ -312,6 +312,9 @@ y el botón para **vaciar favoritos** con confirmación, que corresponden a los 
    | 9 | Modal de detalle (rama del Pull Request) |
    | 10 | Vaciar favoritos y mejoras de accesibilidad (rama del Pull Request) |
    | 11 | Fusión del Pull Request #3 en `main` |
+   | 12 | Ajuste del historial de commits documentado |
+   | 13 | Corrección CSS: el atributo `hidden` ya oculta los componentes |
+   | 14 | Recuento de commits actualizado en la documentación |
 
 3. **Issues** para documentar mejoras: [#1](https://github.com/rub803030/proyecto-web-ia/issues/1) (modal de
    detalle) y [#2](https://github.com/rub803030/proyecto-web-ia/issues/2) (vaciar favoritos).
