@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explorador interactivo de personajes de Rick and Morty: busca, filtra y guarda tus favoritos. Datos en vivo desde la API pública.">
+  <meta name="theme-color" content="#0e1116">
+  <title>Explorador Rick &amp; Morty | Proyecto Web IA</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#resultados">Saltar a los resultados</a>
+
+  <header class="site-header">
+    <div class="container header__inner">
+      <a class="brand" href="./">
+        <span class="brand__portal" aria-hidden="true"></span>
+        <span class="brand__name">
+          Rick <span class="brand__amp">&amp;</span> Morty
+          <small>Explorador de personajes</small>
+        </span>
+      </a>
+      <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false">
+        <span id="themeIcon" aria-hidden="true">🌙</span>
+        <span id="themeLabel">Modo oscuro</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <p class="hero__eyebrow">Datos en vivo · Rick and Morty API</p>
+      <h1 class="hero__title">Explora el <span class="text-gradient">multiverso</span></h1>
+      <p class="hero__text">
+        Busca personajes, filtra por estado o especie y guarda tus favoritos.
+        Los datos se consultan en tiempo real desde la API pública.
+      </p>
+    </section>
+
+    <section class="panel controls" aria-label="Buscador y filtros">
+      <form id="searchForm" class="search" role="search">
+        <div class="search__field">
+          <span class="search__icon" aria-hidden="true">🔍</span>
+          <label class="sr-only" for="searchInput">Nombre del personaje</label>
+          <input id="searchInput" type="search" name="q" placeholder="Buscar por nombre, ej. Rick"
+                 maxlength="40" autocomplete="off" spellcheck="false">
+          <button id="clearSearch" class="search__clear" type="button" hidden aria-label="Borrar búsqueda">✕</button>
+        </div>
+        <button class="btn btn--primary" type="submit">Buscar</button>
+      </form>
+
+      <div class="filters">
+        <div class="field">
+          <label for="statusFilter">Estado</label>
+          <select id="statusFilter">
+            <option value="">Todos</option>
+            <option value="alive">Vivo</option>
+            <option value="dead">Muerto</option>
+            <option value="unknown">Desconocido</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="speciesFilter">Especie</label>
+          <select id="speciesFilter">
+            <option value="">Todas</option>
+            <option value="Human">Humano</option>
+            <option value="Alien">Alienígena</option>
+            <option value="Humanoid">Humanoide</option>
+            <option value="Robot">Robot</option>
+            <option value="Animal">Animal</option>
+            <option value="Mythological">Mitológico</option>
+            <option value="Cronenberg">Cronenberg</option>
+            <option value="Poopybutthole">Poopybutthole</option>
+            <option value="unknown">Desconocida</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="genderFilter">Género</label>
+          <select id="genderFilter">
+            <option value="">Todos</option>
+            <option value="female">Femenino</option>
+            <option value="male">Masculino</option>
+            <option value="genderless">Sin género</option>
+            <option value="unknown">Desconocido</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="sortFilter">Orden</label>
+          <select id="sortFilter">
+            <option value="">Por defecto (ID)</option>
+            <option value="az">Nombre A → Z</option>
+            <option value="za">Nombre Z → A</option>
+          </select>
+        </div>
+
+        <button id="resetBtn" class="btn btn--ghost" type="button">Limpiar filtros</button>
+      </div>
+
+      <div id="history" class="history" hidden>
+        <span class="history__label">Búsquedas recientes:</span>
+        <div id="historyList" class="history__list"></div>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="tabs" role="tablist" aria-label="Vistas de resultados">
+        <button id="tabAll" class="tab is-active" role="tab" aria-selected="true" aria-controls="resultados" type="button">
+          Todos
+        </button>
+        <button id="tabFav" class="tab" role="tab" aria-selected="false" aria-controls="resultados" type="button">
+          Favoritos <span id="favCount" class="badge">0</span>
+        </button>
+      </div>
+      <p id="resultsInfo" class="results-info" aria-live="polite"></p>
+    </div>
+
+    <section id="resultados" class="results" role="tabpanel" aria-live="polite">
+      <div id="message" class="message" hidden>
+        <span id="messageIcon" class="message__icon" aria-hidden="true">⚠️</span>
+        <p id="messageText" class="message__text"></p>
+        <button id="retryBtn" class="btn btn--primary" type="button" hidden>Reintentar</button>
+      </div>
+
+      <div id="skeleton" class="grid grid--skeleton" hidden aria-hidden="true"></div>
+      <div id="grid" class="grid"></div>
+
+      <nav id="pagination" class="pagination" aria-label="Paginación" hidden>
+        <button id="prevBtn" class="btn btn--ghost" type="button">← Anterior</button>
+        <span id="pageInfo" class="pagination__info"></span>
+        <button id="nextBtn" class="btn btn--ghost" type="button">Siguiente →</button>
+      </nav>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <p>
+        Proyecto académico · Datos de
+        <a href="https://rickandmortyapi.com" target="_blank" rel="noopener noreferrer">rickandmortyapi.com</a>
+      </p>
+      <p>Hecho con HTML, CSS y JavaScript · <a href="https://github.com/rub803030/proyecto-web-ia" target="_blank" rel="noopener noreferrer">Ver repositorio</a></p>
+    </div>
+  </footer>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
